@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+
+Sitemap: https://tiwari-printing-press.caffeine.ai/sitemap.xml
