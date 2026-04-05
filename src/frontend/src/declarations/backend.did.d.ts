@@ -36,8 +36,10 @@ export interface _SERVICE {
   'addVideoByUrl' : ActorMethod<[AdminData, string, string, string], string>,
   'deleteTestimonial' : ActorMethod<[AdminData, string], undefined>,
   'deleteVideo' : ActorMethod<[AdminData, string], undefined>,
+  'getHeroImageHash' : ActorMethod<[], string>,
   'getTestimonials' : ActorMethod<[], Array<Testimonial>>,
   'getVideos' : ActorMethod<[], Array<Video>>,
+  'setHeroImageHash' : ActorMethod<[AdminData, string], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

@@ -1,7 +1,14 @@
 import { Button } from "@/components/ui/button";
+import { HttpAgent } from "@icp-sdk/core/agent";
 import { ArrowRight, ChevronRight } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
+import { createActorWithConfig } from "../config";
+import { loadConfig } from "../config";
+import { StorageClient } from "../utils/StorageClient";
+
+const FALLBACK_HERO_IMAGE =
+  "/assets/1775225126583-019d5774-878d-74f4-8dea-f1ee68ec8c8a.png";
 
 const slides = [
   {
@@ -23,12 +30,50 @@ const slides = [
     headline2: "BANNERS & MORE",
     subtext:
       "Visiting cards, wedding cards, brochures, packaging & all printing needs — call +91 8800180074 for a free quote!",
-    highlight: "Open 7 Days, 10AM–9PM",
+    highlight: "Open 7 Days, 10AM\u20139PM",
   },
 ];
 
 export default function Hero() {
   const [current, setCurrent] = useState(0);
+  const [heroImageUrl, setHeroImageUrl] = useState<string>(FALLBACK_HERO_IMAGE);
+
+  useEffect(() => {
+    // Load hero image from backend blob storage
+    let cancelled = false;
+    async function fetchHeroImage() {
+      try {
+        const actor = await createActorWithConfig();
+        const hash = await actor.getHeroImageHash();
+        if (cancelled || !hash || hash.trim() === "") return;
+        // Build direct URL via StorageClient
+        const config = await loadConfig();
+        const gatewayUrl =
+          !config.storage_gateway_url ||
+          config.storage_gateway_url === "nogateway"
+            ? "https://blob.caffeine.ai"
+            : config.storage_gateway_url;
+        const agent = new HttpAgent({ host: config.backend_host });
+        const storageClient = new StorageClient(
+          config.bucket_name,
+          gatewayUrl,
+          config.backend_canister_id,
+          config.project_id,
+          agent,
+        );
+        const url = await storageClient.getDirectURL(hash);
+        if (!cancelled) {
+          setHeroImageUrl(url);
+        }
+      } catch {
+        // Fall back to the local asset quietly
+      }
+    }
+    fetchHeroImage();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(
@@ -46,11 +91,11 @@ export default function Hero() {
 
   return (
     <div className="relative min-h-[92vh] flex items-center overflow-hidden pt-20">
-      {/* Background: user-uploaded hero image */}
+      {/* Background: loaded from backend or fallback local asset */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
-          backgroundImage: `url('/assets/1775225126583-019d5774-878d-74f4-8dea-f1ee68ec8c8a.png')`,
+          backgroundImage: `url('${heroImageUrl}')`,
         }}
       />
 
@@ -145,7 +190,7 @@ export default function Hero() {
             </div>
           </div>
 
-          {/* Right column – stat cards floating over the image */}
+          {/* Right column \u2013 stat cards floating over the image */}
           <motion.div
             initial={{ opacity: 0, x: 60 }}
             animate={{ opacity: 1, x: 0 }}

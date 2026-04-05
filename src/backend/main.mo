@@ -1,4 +1,3 @@
-
 import Time "mo:core/Time";
 import Map "mo:core/Map";
 import Text "mo:core/Text";
@@ -125,6 +124,9 @@ actor {
 
   stable let testimonialStore = Map.empty<Text, Testimonial>();
 
+  // Hero image blob hash — set by admin, read by all visitors
+  stable var heroImageBlobHash : Text = "";
+
   // On first boot after upgrade, migrate old VideoV1 entries into videoStore2.
   // Uses a stable flag to ensure migration runs exactly once.
   stable var videoMigrationDone : Bool = false;
@@ -150,6 +152,19 @@ actor {
 
   func isAdmin(adminData : AdminData) : Bool {
     adminData.id == admin.id and adminData.password == admin.password;
+  };
+
+  // ── Hero Image ──────────────────────────────────────────────────────────────
+
+  public query func getHeroImageHash() : async Text {
+    heroImageBlobHash;
+  };
+
+  public shared ({ caller }) func setHeroImageHash(adminData : AdminData, blobHash : Text) : async () {
+    if (not isAdmin(adminData)) {
+      Runtime.trap("Invalid admin credentials");
+    };
+    heroImageBlobHash := blobHash;
   };
 
   // ── Videos ─────────────────────────────────────────────────────────────────

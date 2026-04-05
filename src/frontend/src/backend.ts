@@ -115,8 +115,10 @@ export interface backendInterface {
     addVideoByUrl(adminData: AdminData, title: string, description: string, url: string): Promise<string>;
     deleteTestimonial(adminData: AdminData, id: string): Promise<void>;
     deleteVideo(adminData: AdminData, id: string): Promise<void>;
+    getHeroImageHash(): Promise<string>;
     getTestimonials(): Promise<Array<Testimonial>>;
     getVideos(): Promise<Array<Video>>;
+    setHeroImageHash(adminData: AdminData, blobHash: string): Promise<void>;
 }
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
@@ -190,6 +192,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async getHeroImageHash(): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getHeroImageHash();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getHeroImageHash();
+            return result;
+        }
+    }
     async getTestimonials(): Promise<Array<Testimonial>> {
         if (this.processError) {
             try {
@@ -215,6 +231,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.getVideos();
+            return result;
+        }
+    }
+    async setHeroImageHash(arg0: AdminData, arg1: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.setHeroImageHash(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.setHeroImageHash(arg0, arg1);
             return result;
         }
     }

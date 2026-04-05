@@ -44,8 +44,10 @@ export const idlService = IDL.Service({
     ),
   'deleteTestimonial' : IDL.Func([AdminData, IDL.Text], [], []),
   'deleteVideo' : IDL.Func([AdminData, IDL.Text], [], []),
+  'getHeroImageHash' : IDL.Func([], [IDL.Text], ['query']),
   'getTestimonials' : IDL.Func([], [IDL.Vec(Testimonial)], ['query']),
   'getVideos' : IDL.Func([], [IDL.Vec(Video)], ['query']),
+  'setHeroImageHash' : IDL.Func([AdminData, IDL.Text], [], []),
 });
 
 export const idlInitArgs = [];
@@ -87,8 +89,10 @@ export const idlFactory = ({ IDL }) => {
       ),
     'deleteTestimonial' : IDL.Func([AdminData, IDL.Text], [], []),
     'deleteVideo' : IDL.Func([AdminData, IDL.Text], [], []),
+    'getHeroImageHash' : IDL.Func([], [IDL.Text], ['query']),
     'getTestimonials' : IDL.Func([], [IDL.Vec(Testimonial)], ['query']),
     'getVideos' : IDL.Func([], [IDL.Vec(Video)], ['query']),
+    'setHeroImageHash' : IDL.Func([AdminData, IDL.Text], [], []),
   });
 };
 
