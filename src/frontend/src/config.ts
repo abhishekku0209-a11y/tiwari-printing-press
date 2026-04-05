@@ -29,6 +29,14 @@ interface Config {
 
 let configCache: Config | null = null;
 
+function resolveStorageGatewayUrl(): string {
+  const envVal = process.env.STORAGE_GATEWAY_URL;
+  if (!envVal || envVal === "nogateway" || envVal === "undefined") {
+    return DEFAULT_STORAGE_GATEWAY_URL;
+  }
+  return envVal;
+}
+
 export async function loadConfig(): Promise<Config> {
   if (configCache) {
     return configCache;
@@ -50,7 +58,7 @@ export async function loadConfig(): Promise<Config> {
       backend_canister_id: (config.backend_canister_id === "undefined"
         ? backendCanisterId
         : config.backend_canister_id) as string,
-      storage_gateway_url: process.env.STORAGE_GATEWAY_URL ?? "nogateway",
+      storage_gateway_url: resolveStorageGatewayUrl(),
       bucket_name: DEFAULT_BUCKET_NAME,
       project_id:
         config.project_id !== "undefined"
