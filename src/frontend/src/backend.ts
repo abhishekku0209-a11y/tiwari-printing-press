@@ -109,6 +109,12 @@ export interface Testimonial {
     author: string;
     rating: bigint;
 }
+export interface GalleryImage {
+    id: string;
+    title: string;
+    blobHash: string;
+    createdAt: bigint;
+}
 export interface backendInterface {
     addTestimonial(adminData: AdminData, author: string, role: string, content: string, rating: bigint): Promise<string>;
     addVideo(adminData: AdminData, title: string, description: string, blobHash: string): Promise<string>;
@@ -119,6 +125,9 @@ export interface backendInterface {
     getTestimonials(): Promise<Array<Testimonial>>;
     getVideos(): Promise<Array<Video>>;
     setHeroImageHash(adminData: AdminData, blobHash: string): Promise<void>;
+    addGalleryImage(adminData: AdminData, title: string, blobHash: string): Promise<string>;
+    getGalleryImages(): Promise<Array<GalleryImage>>;
+    deleteGalleryImage(adminData: AdminData, id: string): Promise<void>;
 }
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
@@ -245,6 +254,48 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.setHeroImageHash(arg0, arg1);
+            return result;
+        }
+    }
+    async addGalleryImage(arg0: AdminData, arg1: string, arg2: string): Promise<string> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.addGalleryImage(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.addGalleryImage(arg0, arg1, arg2);
+            return result;
+        }
+    }
+    async getGalleryImages(): Promise<Array<GalleryImage>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getGalleryImages();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getGalleryImages();
+            return result;
+        }
+    }
+    async deleteGalleryImage(arg0: AdminData, arg1: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteGalleryImage(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteGalleryImage(arg0, arg1);
             return result;
         }
     }

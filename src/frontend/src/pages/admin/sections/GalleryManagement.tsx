@@ -2,58 +2,79 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { HttpAgent } from "@icp-sdk/core/agent";
 import { ImageIcon, Loader2, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { type GalleryRecord, galleryDb } from "../../../store/mediaDb";
+import type { GalleryImage } from "../../../backend";
+import { createActorWithConfig, loadConfig } from "../../../config";
+import { StorageClient } from "../../../utils/StorageClient";
+
+const ADMIN_DATA = { id: "1234tiwari", password: "123456" };
+
+type GalleryImageWithUrl = GalleryImage & { displayUrl: string };
+
+async function buildStorageClient() {
+  const config = await loadConfig();
+  const gatewayUrl =
+    !config.storage_gateway_url || config.storage_gateway_url === "nogateway"
+      ? "https://blob.caffeine.ai"
+      : config.storage_gateway_url;
+  const agent = new HttpAgent({ host: config.backend_host });
+  const storageClient = new StorageClient(
+    config.bucket_name,
+    gatewayUrl,
+    config.backend_canister_id,
+    config.project_id,
+    agent,
+  );
+  return storageClient;
+}
 
 export default function GalleryManagement() {
-  const [images, setImages] = useState<GalleryRecord[]>([]);
-  const [objectUrls, setObjectUrls] = useState<Record<string, string>>({});
+  const [images, setImages] = useState<GalleryImageWithUrl[]>([]);
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [loading, setLoading] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const load = useCallback(async () => {
-    const records = await galleryDb.getAll();
-    setImages(records);
-    // Create object URLs for display
-    const urls: Record<string, string> = {};
-    for (const r of records) {
-      urls[r.id] = URL.createObjectURL(r.blob);
+  const loadImages = useCallback(async () => {
+    try {
+      const backend = await createActorWithConfig();
+      const list = await backend.getGalleryImages();
+      const storageClient = await buildStorageClient();
+      const withUrls: GalleryImageWithUrl[] = await Promise.all(
+        list.map(async (img) => {
+          try {
+            const displayUrl = await storageClient.getDirectURL(img.blobHash);
+            return { ...img, displayUrl };
+          } catch {
+            return { ...img, displayUrl: "" };
+          }
+        }),
+      );
+      setImages(withUrls);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load gallery images.");
+    } finally {
+      setLoading(false);
     }
-    setObjectUrls((prev) => {
-      // Revoke old URLs to free memory
-      for (const url of Object.values(prev)) {
-        URL.revokeObjectURL(url);
-      }
-      return urls;
-    });
   }, []);
 
   useEffect(() => {
-    load();
-    return () => {
-      // Cleanup object URLs on unmount
-      setObjectUrls((prev) => {
-        for (const url of Object.values(prev)) {
-          URL.revokeObjectURL(url);
-        }
-        return {};
-      });
-    };
-  }, [load]);
+    loadImages();
+  }, [loadImages]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    // No size limit — any image allowed
     setFile(f);
-    const previewUrl = URL.createObjectURL(f);
-    setPreview(previewUrl);
+    if (preview) URL.revokeObjectURL(preview);
+    setPreview(URL.createObjectURL(f));
   };
 
   const handleUpload = async () => {
@@ -64,23 +85,23 @@ export default function GalleryManagement() {
     setUploading(true);
     setProgress(0);
     try {
-      for (let p = 10; p <= 80; p += 20) {
-        await new Promise((r) => setTimeout(r, 100));
-        setProgress(p);
-      }
-      await galleryDb.add(title.trim(), file);
-      setProgress(100);
-      await new Promise((r) => setTimeout(r, 200));
-      toast.success("Image uploaded successfully!");
+      const storageClient = await buildStorageClient();
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const { hash } = await storageClient.putFile(bytes, (pct) =>
+        setProgress(pct),
+      );
+      const backend = await createActorWithConfig();
+      await backend.addGalleryImage(ADMIN_DATA, title.trim(), hash);
+      toast.success("Image uploaded! It will now appear on the public site.");
       setTitle("");
       setFile(null);
       if (preview) URL.revokeObjectURL(preview);
       setPreview(null);
       if (fileRef.current) fileRef.current.value = "";
-      await load();
+      await loadImages();
     } catch (err) {
       console.error(err);
-      toast.error("Failed to save image. Please try again.");
+      toast.error("Upload failed. Please try again.");
     } finally {
       setUploading(false);
       setProgress(0);
@@ -88,10 +109,15 @@ export default function GalleryManagement() {
   };
 
   const handleDelete = async (id: string) => {
-    await galleryDb.delete(id);
-    if (objectUrls[id]) URL.revokeObjectURL(objectUrls[id]);
-    toast.success("Image deleted.");
-    await load();
+    try {
+      const backend = await createActorWithConfig();
+      await backend.deleteGalleryImage(ADMIN_DATA, id);
+      toast.success("Image deleted.");
+      await loadImages();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to delete image.");
+    }
   };
 
   return (
@@ -171,7 +197,16 @@ export default function GalleryManagement() {
       </div>
 
       {/* Image grid */}
-      {images.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {["sk-1", "sk-2", "sk-3", "sk-4"].map((sk) => (
+            <div
+              key={sk}
+              className="bg-secondary rounded-xl h-40 animate-pulse"
+            />
+          ))}
+        </div>
+      ) : images.length === 0 ? (
         <div
           className="text-center py-16 border-2 border-dashed border-border rounded-2xl text-muted-foreground"
           data-ocid="gallery.empty_state"
@@ -190,17 +225,20 @@ export default function GalleryManagement() {
               data-ocid={`gallery.item.${i + 1}`}
               className="group relative bg-secondary rounded-xl overflow-hidden border border-border"
             >
-              <img
-                src={objectUrls[img.id] ?? ""}
-                alt={img.title}
-                className="w-full aspect-square object-cover"
-              />
+              {img.displayUrl ? (
+                <img
+                  src={img.displayUrl}
+                  alt={img.title}
+                  className="w-full aspect-square object-cover"
+                />
+              ) : (
+                <div className="w-full aspect-square flex items-center justify-center bg-secondary">
+                  <ImageIcon className="w-8 h-8 text-muted-foreground opacity-30" />
+                </div>
+              )}
               <div className="p-2">
                 <p className="text-xs font-semibold text-navy truncate">
                   {img.title}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(img.createdAt).toLocaleDateString("en-IN")}
                 </p>
               </div>
               <button

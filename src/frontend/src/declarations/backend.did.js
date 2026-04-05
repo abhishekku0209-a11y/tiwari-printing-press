@@ -25,6 +25,12 @@ export const Video = IDL.Record({
   'blobHash' : IDL.Text,
   'videoUrl' : IDL.Text,
 });
+export const GalleryImage = IDL.Record({
+  'id' : IDL.Text,
+  'title' : IDL.Text,
+  'blobHash' : IDL.Text,
+  'createdAt' : IDL.Int,
+});
 
 export const idlService = IDL.Service({
   'addTestimonial' : IDL.Func(
@@ -48,6 +54,9 @@ export const idlService = IDL.Service({
   'getTestimonials' : IDL.Func([], [IDL.Vec(Testimonial)], ['query']),
   'getVideos' : IDL.Func([], [IDL.Vec(Video)], ['query']),
   'setHeroImageHash' : IDL.Func([AdminData, IDL.Text], [], []),
+  'addGalleryImage' : IDL.Func([AdminData, IDL.Text, IDL.Text], [IDL.Text], []),
+  'getGalleryImages' : IDL.Func([], [IDL.Vec(GalleryImage)], ['query']),
+  'deleteGalleryImage' : IDL.Func([AdminData, IDL.Text], [], []),
 });
 
 export const idlInitArgs = [];
@@ -69,6 +78,12 @@ export const idlFactory = ({ IDL }) => {
     'description' : IDL.Text,
     'blobHash' : IDL.Text,
     'videoUrl' : IDL.Text,
+  });
+  const GalleryImage = IDL.Record({
+    'id' : IDL.Text,
+    'title' : IDL.Text,
+    'blobHash' : IDL.Text,
+    'createdAt' : IDL.Int,
   });
   
   return IDL.Service({
@@ -93,6 +108,9 @@ export const idlFactory = ({ IDL }) => {
     'getTestimonials' : IDL.Func([], [IDL.Vec(Testimonial)], ['query']),
     'getVideos' : IDL.Func([], [IDL.Vec(Video)], ['query']),
     'setHeroImageHash' : IDL.Func([AdminData, IDL.Text], [], []),
+    'addGalleryImage' : IDL.Func([AdminData, IDL.Text, IDL.Text], [IDL.Text], []),
+    'getGalleryImages' : IDL.Func([], [IDL.Vec(GalleryImage)], ['query']),
+    'deleteGalleryImage' : IDL.Func([AdminData, IDL.Text], [], []),
   });
 };
 

@@ -5,13 +5,14 @@ import type { Testimonial } from "../backend";
 import { createActorWithConfig } from "../config";
 import { useInView } from "../hooks/useInView";
 
+// 10 hardcoded high-quality testimonials -- always visible even without backend
 const DEFAULT_TESTIMONIALS: Testimonial[] = [
   {
     id: "default-1",
     author: "Rajesh Sharma",
-    role: "Business Owner",
+    role: "Business Owner, Karol Bagh",
     content:
-      "Outstanding print quality! My business cards turned out even better than expected. Fast delivery and great pricing.",
+      "Outstanding print quality! My business cards turned out even better than expected. Fast delivery and pricing that beats every shop in Shahdara.",
     rating: BigInt(5),
     createdAt: BigInt(0),
   },
@@ -20,16 +21,79 @@ const DEFAULT_TESTIMONIALS: Testimonial[] = [
     author: "Priya Patel",
     role: "Marketing Manager",
     content:
-      "Used them for our company event banners. The colors were vibrant and the team was professional throughout.",
+      "Used Tiwari Printing Press for our company event banners. The colors were vibrant, the team was professional, and delivery was on time. Highly recommend!",
     rating: BigInt(5),
     createdAt: BigInt(0),
   },
   {
     id: "default-3",
     author: "Amit Kumar",
-    role: "Restaurant Owner",
+    role: "Restaurant Owner, Maujpur",
     content:
-      "Ordered 5000 menu flyers and they were delivered in 2 days! Top-notch quality and unbeatable prices.",
+      "Ordered 5000 menu flyers and they were delivered in 2 days! Top-notch quality, accurate colors, and the pricing was unbeatable.",
+    rating: BigInt(5),
+    createdAt: BigInt(0),
+  },
+  {
+    id: "default-4",
+    author: "Sunita Verma",
+    role: "Wedding Planner",
+    content:
+      "Got our wedding invitation cards printed here. Every card was flawless with beautiful gold foiling. The Tiwari team made our special day even more special.",
+    rating: BigInt(5),
+    createdAt: BigInt(0),
+  },
+  {
+    id: "default-5",
+    author: "Deepak Gupta",
+    role: "Shop Owner, Dilshad Garden",
+    content:
+      "Best flex printing in Shahdara, no doubt. My shop board looks amazing. They matched the colors exactly to my design file. Will order again!",
+    rating: BigInt(5),
+    createdAt: BigInt(0),
+  },
+  {
+    id: "default-6",
+    author: "Neha Singh",
+    role: "Event Coordinator",
+    content:
+      "Printed 200 brochures for our corporate event. Professional finish, perfect binding, zero errors. The staff was helpful and the turnaround was super quick.",
+    rating: BigInt(5),
+    createdAt: BigInt(0),
+  },
+  {
+    id: "default-7",
+    author: "Mohit Agarwal",
+    role: "Startup Founder",
+    content:
+      "Tiwari Printing Press helped us print our entire product launch kit -- visiting cards, catalogs, and stickers. Everything was perfect quality and very affordable.",
+    rating: BigInt(5),
+    createdAt: BigInt(0),
+  },
+  {
+    id: "default-8",
+    author: "Kavita Joshi",
+    role: "School Principal",
+    content:
+      "We order all our school calendars and letterheads from here every year. Consistent quality, great paper, and Manish ji is always helpful and responsive.",
+    rating: BigInt(5),
+    createdAt: BigInt(0),
+  },
+  {
+    id: "default-9",
+    author: "Ravi Shankar",
+    role: "Textile Merchant",
+    content:
+      "Packaging labels and stickers for my textile business come out perfect every time. The lamination quality is excellent and they never miss a deadline.",
+    rating: BigInt(5),
+    createdAt: BigInt(0),
+  },
+  {
+    id: "default-10",
+    author: "Anita Choudhary",
+    role: "NGO Director",
+    content:
+      "Printed 10,000 awareness pamphlets for our campaign at a very affordable rate. Great quality on recycled paper and the whole order was ready in 48 hours!",
     rating: BigInt(4),
     createdAt: BigInt(0),
   },
@@ -40,7 +104,7 @@ export default function Testimonials() {
   const inView = useInView(ref);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
-  // Start with defaults so testimonials are always visible immediately
+  // Start with 10 hardcoded defaults -- always visible
   const [testimonials, setTestimonials] =
     useState<Testimonial[]>(DEFAULT_TESTIMONIALS);
 

@@ -1,12 +1,10 @@
 import Time "mo:core/Time";
 import Map "mo:core/Map";
 import Text "mo:core/Text";
-import Array "mo:core/Array";
 import Order "mo:core/Order";
 import Runtime "mo:core/Runtime";
 import Int "mo:core/Int";
 import Nat "mo:core/Nat";
-import Principal "mo:core/Principal";
 import Prim "mo:prim";
 import Storage "blob-storage/Storage";
 
@@ -38,11 +36,11 @@ actor {
     await Storage.refillCashier(_caffeineStorageState, cashier, refillInformation);
   };
 
-  public shared ({ caller }) func _caffeineStorageUpdateGatewayPrincipals() : async () {
+  public shared func _caffeineStorageUpdateGatewayPrincipals() : async () {
     await Storage.updateGatewayPrincipals(_caffeineStorageState);
   };
 
-  public query ({ caller }) func _caffeineStorageBlobIsLive(hash : Blob) : async Bool {
+  public query func _caffeineStorageBlobIsLive(hash : Blob) : async Bool {
     Prim.isStorageBlobLive(hash);
   };
 
@@ -69,7 +67,7 @@ actor {
     await myGC.__motoko_gc_trigger();
   };
 
-  public query ({ caller }) func _caffeineStorageCreateCertificate(blobHash : Text) : async _CaffeineStorageCreateCertificateResult {
+  public query func _caffeineStorageCreateCertificate(blobHash : Text) : async _CaffeineStorageCreateCertificateResult {
     {
       method = "upload";
       blob_hash = blobHash;
@@ -89,7 +87,6 @@ actor {
   };
 
   // Video: the current application type that adds videoUrl.
-  // New entries in videoStore2 use this type.
   type Video = {
     id : Text;
     title : Text;
@@ -108,6 +105,13 @@ actor {
     createdAt : Int;
   };
 
+  type GalleryImage = {
+    id : Text;
+    title : Text;
+    blobHash : Text;
+    createdAt : Int;
+  };
+
   type AdminData = {
     id : Text;
     password : Text;
@@ -115,20 +119,18 @@ actor {
 
   let admin = { id = "1234tiwari"; password = "123456" };
 
-  // videoStore: legacy stable store (VideoV1, no videoUrl).
-  // Never written to again; only read during migration.
-  stable let videoStore = Map.empty<Text, VideoV1>();
+  // ── Stable stores ────────────────────────────────────────────────────────────
 
-  // videoStore2: new stable store (Video with videoUrl).
-  stable let videoStore2 = Map.empty<Text, Video>();
-
-  stable let testimonialStore = Map.empty<Text, Testimonial>();
+  // Maps are implicitly stable; no `stable` keyword needed on let-bound Maps.
+  let videoStore = Map.empty<Text, VideoV1>();
+  let videoStore2 = Map.empty<Text, Video>();
+  let testimonialStore = Map.empty<Text, Testimonial>();
+  let galleryStore = Map.empty<Text, GalleryImage>();
 
   // Hero image blob hash — set by admin, read by all visitors
   stable var heroImageBlobHash : Text = "";
 
-  // On first boot after upgrade, migrate old VideoV1 entries into videoStore2.
-  // Uses a stable flag to ensure migration runs exactly once.
+  // Migration flag for video V1 -> V2
   stable var videoMigrationDone : Bool = false;
 
   if (not videoMigrationDone) {
@@ -146,8 +148,8 @@ actor {
     videoMigrationDone := true;
   };
 
-  func compareVideosByCreatedAt(v1 : Video, v2 : Video) : Order.Order {
-    Int.compare(v2.createdAt, v1.createdAt);
+  func compareByCreatedAtDesc(a : Int, b : Int) : Order.Order {
+    Int.compare(b, a);
   };
 
   func isAdmin(adminData : AdminData) : Bool {
@@ -160,21 +162,54 @@ actor {
     heroImageBlobHash;
   };
 
-  public shared ({ caller }) func setHeroImageHash(adminData : AdminData, blobHash : Text) : async () {
+  public shared func setHeroImageHash(adminData : AdminData, blobHash : Text) : async () {
     if (not isAdmin(adminData)) {
       Runtime.trap("Invalid admin credentials");
     };
     heroImageBlobHash := blobHash;
   };
 
-  // ── Videos ─────────────────────────────────────────────────────────────────
+  // ── Gallery ─────────────────────────────────────────────────────────────────
 
-  // Add a video uploaded from device (blob storage)
-  public shared ({ caller }) func addVideo(adminData : AdminData, title : Text, description : Text, blobHash : Text) : async Text {
+  public shared func addGalleryImage(adminData : AdminData, title : Text, blobHash : Text) : async Text {
     if (not isAdmin(adminData)) {
       Runtime.trap("Invalid admin credentials");
     };
-    let videoId = blobHash.concat(title.concat(description));
+    let imageId = blobHash # title;
+    let newImage : GalleryImage = {
+      id = imageId;
+      title;
+      blobHash;
+      createdAt = Time.now();
+    };
+    galleryStore.add(imageId, newImage);
+    imageId;
+  };
+
+  public query func getGalleryImages() : async [GalleryImage] {
+    let arr = galleryStore.values().toArray();
+    arr.sort(func(a : GalleryImage, b : GalleryImage) : Order.Order {
+      compareByCreatedAtDesc(a.createdAt, b.createdAt);
+    });
+  };
+
+  public shared func deleteGalleryImage(adminData : AdminData, id : Text) : async () {
+    if (not isAdmin(adminData)) {
+      Runtime.trap("Invalid admin credentials");
+    };
+    if (not galleryStore.containsKey(id)) {
+      Runtime.trap("Gallery image not found");
+    };
+    galleryStore.remove(id);
+  };
+
+  // ── Videos ─────────────────────────────────────────────────────────────────
+
+  public shared func addVideo(adminData : AdminData, title : Text, description : Text, blobHash : Text) : async Text {
+    if (not isAdmin(adminData)) {
+      Runtime.trap("Invalid admin credentials");
+    };
+    let videoId = blobHash # title # description;
     let newVideo : Video = {
       id = videoId;
       title;
@@ -187,12 +222,11 @@ actor {
     videoId;
   };
 
-  // Add a video by pasting a URL (YouTube or direct video link)
-  public shared ({ caller }) func addVideoByUrl(adminData : AdminData, title : Text, description : Text, videoUrl : Text) : async Text {
+  public shared func addVideoByUrl(adminData : AdminData, title : Text, description : Text, videoUrl : Text) : async Text {
     if (not isAdmin(adminData)) {
       Runtime.trap("Invalid admin credentials");
     };
-    let videoId = videoUrl.concat(title);
+    let videoId = videoUrl # title;
     let newVideo : Video = {
       id = videoId;
       title;
@@ -205,11 +239,14 @@ actor {
     videoId;
   };
 
-  public query ({ caller }) func getVideos() : async [Video] {
-    videoStore2.values().toArray().sort(compareVideosByCreatedAt);
+  public query func getVideos() : async [Video] {
+    let arr = videoStore2.values().toArray();
+    arr.sort(func(a : Video, b : Video) : Order.Order {
+      compareByCreatedAtDesc(a.createdAt, b.createdAt);
+    });
   };
 
-  public shared ({ caller }) func deleteVideo(adminData : AdminData, id : Text) : async () {
+  public shared func deleteVideo(adminData : AdminData, id : Text) : async () {
     if (not isAdmin(adminData)) {
       Runtime.trap("Invalid admin credentials");
     };
@@ -221,11 +258,11 @@ actor {
 
   // ── Testimonials ────────────────────────────────────────────────────────────
 
-  public shared ({ caller }) func addTestimonial(adminData : AdminData, author : Text, role : Text, content : Text, rating : Nat) : async Text {
+  public shared func addTestimonial(adminData : AdminData, author : Text, role : Text, content : Text, rating : Nat) : async Text {
     if (not isAdmin(adminData)) {
       Runtime.trap("Invalid admin credentials");
     };
-    let testimonialId = author.concat(content);
+    let testimonialId = author # content;
     let newTestimonial : Testimonial = {
       id = testimonialId;
       author;
@@ -238,11 +275,11 @@ actor {
     testimonialId;
   };
 
-  public query ({ caller }) func getTestimonials() : async [Testimonial] {
+  public query func getTestimonials() : async [Testimonial] {
     testimonialStore.values().toArray();
   };
 
-  public shared ({ caller }) func deleteTestimonial(adminData : AdminData, id : Text) : async () {
+  public shared func deleteTestimonial(adminData : AdminData, id : Text) : async () {
     if (not isAdmin(adminData)) {
       Runtime.trap("Invalid admin credentials");
     };

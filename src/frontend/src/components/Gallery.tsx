@@ -3,10 +3,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ZoomIn } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import type { GalleryImage } from "../backend";
+import { createActorWithConfig, loadConfig } from "../config";
 import { useInView } from "../hooks/useInView";
-import { type GalleryRecord, galleryDb } from "../store/mediaDb";
+import { StorageClient } from "../utils/StorageClient";
 
-const sampleImages = [
+const SAMPLE_IMAGES = [
   {
     id: "sample-1",
     title: "Business Cards",
@@ -52,46 +54,75 @@ type DisplayImage = {
   category: string;
 };
 
+async function buildGalleryUrl(blobHash: string): Promise<string> {
+  const config = await loadConfig();
+  const gatewayUrl =
+    !config.storage_gateway_url || config.storage_gateway_url === "nogateway"
+      ? "https://blob.caffeine.ai"
+      : config.storage_gateway_url;
+  const { HttpAgent } = await import("@icp-sdk/core/agent");
+  const agent = new HttpAgent({ host: config.backend_host });
+  const storageClient = new StorageClient(
+    config.bucket_name,
+    gatewayUrl,
+    config.backend_canister_id,
+    config.project_id,
+    agent,
+  );
+  return storageClient.getDirectURL(blobHash);
+}
+
 export default function Gallery() {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref);
   const headingRef = useRef<HTMLDivElement>(null);
   const headingInView = useInView(headingRef);
   const [selected, setSelected] = useState<DisplayImage | null>(null);
-  const [adminImages, setAdminImages] = useState<GalleryRecord[]>([]);
-  const [objectUrls, setObjectUrls] = useState<Record<string, string>>({});
+  const [displayImages, setDisplayImages] =
+    useState<DisplayImage[]>(SAMPLE_IMAGES);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    galleryDb.getAll().then((records) => {
-      setAdminImages(records);
-      const urls: Record<string, string> = {};
-      for (const r of records) {
-        urls[r.id] = URL.createObjectURL(r.blob);
-      }
-      setObjectUrls(urls);
-      setLoading(false);
-    });
-    return () => {
-      setObjectUrls((prev) => {
-        for (const url of Object.values(prev)) {
-          URL.revokeObjectURL(url);
+    let cancelled = false;
+    async function fetchGallery() {
+      try {
+        const backend = await createActorWithConfig();
+        const images: GalleryImage[] = await backend.getGalleryImages();
+        if (cancelled) return;
+        if (images.length > 0) {
+          // Build blob URLs for all images
+          const resolved: DisplayImage[] = await Promise.all(
+            images.map(async (img) => {
+              try {
+                const src = await buildGalleryUrl(img.blobHash);
+                return {
+                  id: img.id,
+                  title: img.title,
+                  src,
+                  category: "Gallery",
+                };
+              } catch {
+                return null;
+              }
+            }),
+          ).then((arr) => arr.filter(Boolean) as DisplayImage[]);
+          if (!cancelled && resolved.length > 0) {
+            setDisplayImages(resolved);
+          }
         }
-        return {};
-      });
+        // If backend returns empty, keep showing sample images
+      } catch (err) {
+        console.error("Failed to load gallery:", err);
+        // Keep showing sample images on error
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchGallery();
+    return () => {
+      cancelled = true;
     };
   }, []);
-
-  // If admin has uploaded images, show those; otherwise show sample images
-  const displayImages: DisplayImage[] =
-    adminImages.length > 0
-      ? adminImages.map((r) => ({
-          id: r.id,
-          title: r.title,
-          src: objectUrls[r.id] ?? "",
-          category: "Gallery",
-        }))
-      : sampleImages;
 
   return (
     <div ref={ref} className="py-20 lg:py-28 bg-[#F7F8FB]">

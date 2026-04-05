@@ -27,6 +27,12 @@ export interface Video {
   'blobHash' : string,
   'videoUrl' : string,
 }
+export interface GalleryImage {
+  'id' : string,
+  'title' : string,
+  'blobHash' : string,
+  'createdAt' : bigint,
+}
 export interface _SERVICE {
   'addTestimonial' : ActorMethod<
     [AdminData, string, string, string, bigint],
@@ -40,6 +46,9 @@ export interface _SERVICE {
   'getTestimonials' : ActorMethod<[], Array<Testimonial>>,
   'getVideos' : ActorMethod<[], Array<Video>>,
   'setHeroImageHash' : ActorMethod<[AdminData, string], undefined>,
+  'addGalleryImage' : ActorMethod<[AdminData, string, string], string>,
+  'getGalleryImages' : ActorMethod<[], Array<GalleryImage>>,
+  'deleteGalleryImage' : ActorMethod<[AdminData, string], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

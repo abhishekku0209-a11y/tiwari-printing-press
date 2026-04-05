@@ -15,6 +15,12 @@ export interface Video {
     blobHash: string;
     videoUrl: string;
 }
+export interface GalleryImage {
+    id: string;
+    title: string;
+    blobHash: string;
+    createdAt: bigint;
+}
 export interface AdminData {
     id: string;
     password: string;
@@ -35,4 +41,9 @@ export interface backendInterface {
     deleteVideo(adminData: AdminData, id: string): Promise<void>;
     getTestimonials(): Promise<Array<Testimonial>>;
     getVideos(): Promise<Array<Video>>;
+    getHeroImageHash(): Promise<string>;
+    setHeroImageHash(adminData: AdminData, blobHash: string): Promise<void>;
+    addGalleryImage(adminData: AdminData, title: string, blobHash: string): Promise<string>;
+    getGalleryImages(): Promise<Array<GalleryImage>>;
+    deleteGalleryImage(adminData: AdminData, id: string): Promise<void>;
 }
