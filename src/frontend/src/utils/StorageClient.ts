@@ -1,4 +1,4 @@
-import type { HttpAgent } from "@icp-sdk/core/agent";
+import { type HttpAgent, isV3ResponseBody } from "@icp-sdk/core/agent";
 import { IDL } from "@icp-sdk/core/candid";
 
 type Headers = Record<string, string>;
@@ -478,52 +478,21 @@ export class StorageClient {
     private readonly projectId: string,
     private readonly agent: HttpAgent,
   ) {
-    // Normalize the gateway URL -- never let "nogateway" or empty reach the network
-    const normalizedUrl =
-      !storageGatewayUrl ||
-      storageGatewayUrl === "nogateway" ||
-      storageGatewayUrl.trim() === ""
-        ? "https://blob.caffeine.ai"
-        : storageGatewayUrl;
-    this.storageGatewayClient = new StorageGatewayClient(normalizedUrl);
+    this.storageGatewayClient = new StorageGatewayClient(storageGatewayUrl);
   }
 
-  /**
-   * Obtain the upload certificate from the backend canister.
-   *
-   * The canister's `_caffeineStorageCreateCertificate` is a **query** function
-   * that returns a plain Candid record `{ method: Text; blob_hash: Text }` --
-   * NOT a raw IC v3 binary certificate.  We call it as a query, decode the
-   * result with the IDL type, then re-encode those bytes as the certificate
-   * payload expected by the storage gateway.
-   */
   private async getCertificate(hash: string): Promise<Uint8Array> {
-    const resultType = IDL.Record({
-      method: IDL.Text,
-      blob_hash: IDL.Text,
-    });
-    const argBytes = IDL.encode([IDL.Text], [hash]);
-
-    // Use agent.query so we get back the decoded response without needing v3
-    const queryResult = await this.agent.query(this.backendCanisterId, {
+    const args = IDL.encode([IDL.Text], [hash]);
+    const result = await this.agent.call(this.backendCanisterId, {
       methodName: "_caffeineStorageCreateCertificate",
-      arg: argBytes,
+      arg: args,
     });
-
-    if (queryResult.status === "rejected") {
-      throw new Error(
-        `Certificate query rejected: ${queryResult.reject_message}`,
-      );
+    const respone = result.response.body;
+    if (isV3ResponseBody(respone)) {
+      console.log("Certificate:", respone.certificate);
+      return respone.certificate;
     }
-
-    // Decode the Candid response
-    const decoded = IDL.decode([resultType], queryResult.reply.arg) as [
-      { method: string; blob_hash: string },
-    ];
-    const record = decoded[0];
-
-    // Re-encode the record as the certificate bytes the gateway expects
-    return IDL.encode([resultType], [record]);
+    throw new Error("Expected v3 response body");
   }
 
   public async putFile(
