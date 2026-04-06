@@ -29,12 +29,12 @@ interface Config {
 
 let configCache: Config | null = null;
 
-function resolveStorageGatewayUrl(): string {
-  const envVal = process.env.STORAGE_GATEWAY_URL;
-  if (!envVal || envVal === "nogateway" || envVal === "undefined") {
+/** Normalize the storage gateway URL -- never return "nogateway" or empty. */
+function normalizeGatewayUrl(raw: string | undefined | null): string {
+  if (!raw || raw.trim() === "" || raw === "nogateway") {
     return DEFAULT_STORAGE_GATEWAY_URL;
   }
-  return envVal;
+  return raw;
 }
 
 export async function loadConfig(): Promise<Config> {
@@ -58,7 +58,7 @@ export async function loadConfig(): Promise<Config> {
       backend_canister_id: (config.backend_canister_id === "undefined"
         ? backendCanisterId
         : config.backend_canister_id) as string,
-      storage_gateway_url: resolveStorageGatewayUrl(),
+      storage_gateway_url: normalizeGatewayUrl(process.env.STORAGE_GATEWAY_URL),
       bucket_name: DEFAULT_BUCKET_NAME,
       project_id:
         config.project_id !== "undefined"

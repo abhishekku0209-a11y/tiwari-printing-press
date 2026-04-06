@@ -121,11 +121,17 @@ actor {
 
   // ── Stable stores ────────────────────────────────────────────────────────────
 
-  // Maps are implicitly stable; no `stable` keyword needed on let-bound Maps.
+  // Keep video stores as-is for backward compatibility (not used in UI)
   let videoStore = Map.empty<Text, VideoV1>();
   let videoStore2 = Map.empty<Text, Video>();
-  let testimonialStore = Map.empty<Text, Testimonial>();
-  let galleryStore = Map.empty<Text, GalleryImage>();
+
+  // Testimonials and gallery must be stable so data persists across upgrades
+  stable var testimonialEntries : [(Text, Testimonial)] = [];
+  stable var galleryEntries : [(Text, GalleryImage)] = [];
+
+  // Reconstruct the maps from stable entries on each upgrade
+  let testimonialStore = Map.fromIter<Text, Testimonial>(testimonialEntries.vals());
+  let galleryStore = Map.fromIter<Text, GalleryImage>(galleryEntries.vals());
 
   // Hero image blob hash — set by admin, read by all visitors
   stable var heroImageBlobHash : Text = "";
@@ -146,6 +152,17 @@ actor {
       videoStore2.add(v.id, migrated);
     };
     videoMigrationDone := true;
+  };
+
+  // Persist map contents back to stable arrays before each upgrade
+  system func preupgrade() {
+    testimonialEntries := testimonialStore.entries().toArray();
+    galleryEntries := galleryStore.entries().toArray();
+  };
+
+  system func postupgrade() {
+    testimonialEntries := [];
+    galleryEntries := [];
   };
 
   func compareByCreatedAtDesc(a : Int, b : Int) : Order.Order {
@@ -276,7 +293,10 @@ actor {
   };
 
   public query func getTestimonials() : async [Testimonial] {
-    testimonialStore.values().toArray();
+    let arr = testimonialStore.values().toArray();
+    arr.sort(func(a : Testimonial, b : Testimonial) : Order.Order {
+      compareByCreatedAtDesc(a.createdAt, b.createdAt);
+    });
   };
 
   public shared func deleteTestimonial(adminData : AdminData, id : Text) : async () {
