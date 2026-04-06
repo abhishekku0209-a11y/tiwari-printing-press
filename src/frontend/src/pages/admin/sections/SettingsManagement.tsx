@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { HttpAgent } from "@icp-sdk/core/agent";
 import {
@@ -15,7 +16,12 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { createActorWithConfig, loadConfig } from "../../../config";
-import { type SiteSettings, settingsStore } from "../../../store/adminStore";
+import {
+  type DesignItem,
+  type SiteSettings,
+  designStore,
+  settingsStore,
+} from "../../../store/adminStore";
 import { StorageClient } from "../../../utils/StorageClient";
 
 const ADMIN_DATA = { id: "1234tiwari", password: "123456" };
@@ -32,12 +38,22 @@ export default function SettingsManagement() {
   const [currentHeroUrl, setCurrentHeroUrl] = useState<string | null>(null);
   const heroFileRef = useRef<HTMLInputElement>(null);
 
+  // Design images for "choose from existing"
+  const [designImages, setDesignImages] = useState<DesignItem[]>([]);
+
   useEffect(() => {
     setSettings(settingsStore.get());
     loadCurrentHeroImage();
+    setDesignImages(designStore.get());
   }, []);
 
   async function loadCurrentHeroImage() {
+    // Check localStorage override first
+    const localDataUrl = localStorage.getItem("tpp_hero_dataurl");
+    if (localDataUrl) {
+      setCurrentHeroUrl(localDataUrl);
+      return;
+    }
     try {
       const actor = await createActorWithConfig();
       const hash = await actor.getHeroImageHash();
@@ -100,6 +116,8 @@ export default function SettingsManagement() {
       // Save hash to backend
       const actor = await createActorWithConfig();
       await actor.setHeroImageHash(ADMIN_DATA, hash);
+      // Clear localStorage override so the backend-stored image takes precedence
+      localStorage.removeItem("tpp_hero_dataurl");
       // Update preview to live URL
       const url = await storageClient.getDirectURL(hash);
       setCurrentHeroUrl(url);
@@ -115,6 +133,16 @@ export default function SettingsManagement() {
       setHeroUploading(false);
       setHeroProgress(0);
     }
+  };
+
+  const handleSelectDesignAsHero = (design: DesignItem) => {
+    localStorage.setItem("tpp_hero_dataurl", design.dataUrl);
+    setCurrentHeroUrl(design.dataUrl);
+    setHeroFile(null);
+    if (heroPreview) URL.revokeObjectURL(heroPreview);
+    setHeroPreview(null);
+    if (heroFileRef.current) heroFileRef.current.value = "";
+    toast.success("Hero image updated from gallery!");
   };
 
   const handleSave = async () => {
@@ -138,8 +166,7 @@ export default function SettingsManagement() {
           <div>
             <h3 className="font-bold text-navy">Hero Background Image</h3>
             <p className="text-xs text-muted-foreground">
-              Upload a new hero image. It will be visible to all visitors
-              immediately.
+              Upload a new hero image or choose from your design uploads.
             </p>
           </div>
         </div>
@@ -214,6 +241,54 @@ export default function SettingsManagement() {
               </>
             )}
           </Button>
+
+          {/* Divider */}
+          <div className="pt-2">
+            <Separator className="mb-4" />
+            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 block">
+              Or choose from uploaded images:
+            </Label>
+
+            {designImages.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic">
+                No images yet — upload designs in the Designs tab first.
+              </p>
+            ) : (
+              <div
+                className="overflow-y-auto rounded-xl border border-border bg-muted/30 p-2"
+                style={{ maxHeight: "300px" }}
+                data-ocid="settings.hero_gallery_panel"
+              >
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {designImages.map((design, idx) => (
+                    <div
+                      key={design.id}
+                      className="group relative aspect-square rounded-lg overflow-hidden border border-border cursor-pointer"
+                      data-ocid={`settings.hero_gallery.item.${idx + 1}`}
+                    >
+                      <img
+                        src={design.dataUrl}
+                        alt={`Design ${idx + 1}`}
+                        className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                      />
+                      {/* Hover overlay */}
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => handleSelectDesignAsHero(design)}
+                          data-ocid={`settings.hero_gallery.select_button.${idx + 1}`}
+                          className="bg-gold hover:bg-gold-dark text-navy font-bold text-xs px-2 py-1 h-auto"
+                        >
+                          Use as Hero
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

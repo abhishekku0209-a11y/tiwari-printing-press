@@ -42,6 +42,12 @@ export default function Hero() {
     // Load hero image from backend blob storage
     let cancelled = false;
     async function fetchHeroImage() {
+      // Check localStorage override first
+      const localDataUrl = localStorage.getItem("tpp_hero_dataurl");
+      if (localDataUrl) {
+        setHeroImageUrl(localDataUrl);
+        return; // don't fetch from backend
+      }
       try {
         const actor = await createActorWithConfig();
         const hash = await actor.getHeroImageHash();
@@ -190,7 +196,7 @@ export default function Hero() {
             </div>
           </div>
 
-          {/* Right column \u2013 stat cards floating over the image */}
+          {/* Right column – stat cards floating over the image */}
           <motion.div
             initial={{ opacity: 0, x: 60 }}
             animate={{ opacity: 1, x: 0 }}
